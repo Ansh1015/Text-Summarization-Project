@@ -18,12 +18,11 @@ class DataTransformation:
             max_length=1024,
             truncation=True,
         )
-        with self.tokenizer.as_target_tokenizer():
-            target_encodings = self.tokenizer(
-                example_batch["summary"],
-                max_length=128,
-                truncation=True,
-            )
+        target_encodings = self.tokenizer(
+            text_target=example_batch["summary"],
+            max_length=128,
+            truncation=True,
+        )
         return {
             "input_ids": input_encodings["input_ids"],
             "attention_mask": input_encodings["attention_mask"],
