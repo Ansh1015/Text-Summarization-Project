@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Text Summarizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+      padding: 2rem;
+      width: 100%;
+      max-width: 720px;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.35rem; }
+    .subtitle { color: #6b7280; font-size: 0.95rem; margin-bottom: 1.5rem; }
+
+    label { display: block; font-weight: 600; font-size: 0.9rem; color: #374151; margin-bottom: 0.4rem; }
+    .hint { font-size: 0.8rem; color: #9ca3af; margin-bottom: 0.5rem; }
+
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      padding: 0.75rem 1rem;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      resize: vertical;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    textarea:focus { outline: none; border-color: #4f46e5; }
+
+    .char-count { text-align: right; font-size: 0.78rem; color: #9ca3af; margin-top: 0.3rem; margin-bottom: 1rem; }
+    .char-count.warn { color: #ef4444; }
+
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    button:hover:not(:disabled) { background: #4338ca; }
+    button:disabled { opacity: 0.65; cursor: not-allowed; }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-section { margin-top: 1.5rem; display: none; }
+    .result-label {
+      font-weight: 600; font-size: 0.9rem; color: #374151;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .copy-btn {
+      background: #f3f4f6; color: #374151;
+      border: 1px solid #d1d5db;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      width: auto;
+    }
+    .copy-btn:hover { background: #e5e7eb; }
+
+    .result-box {
+      background: #f9fafb;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #111827;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .error-banner {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      color: #dc2626;
+      font-size: 0.9rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Text Summarizer</h1>
+    <p class="subtitle">Fine-tuned PEGASUS on SAMSum — paste a conversation or text below to generate a concise summary.</p>
+
+    <label for="inputText">Input Text</label>
+    <p class="hint">Min 1 character · Max 4,096 characters</p>
+    <textarea id="inputText" placeholder="Paste a conversation or article here…" maxlength="4096"></textarea>
+    <div class="char-count" id="charCount">0 / 4096</div>
+
+    <button id="submitBtn" onclick="summarize()">
+      <span class="spinner" id="spinner"></span>
+      <span id="btnLabel">Summarize</span>
+    </button>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div class="result-section" id="resultSection">
+      <div class="result-label">
+        Summary
+        <button class="copy-btn" onclick="copyResult()">Copy</button>
+      </div>
+      <div class="result-box" id="resultBox"></div>
+    </div>
+  </div>
+
+  <script>
+    const textarea = document.getElementById("inputText");
+    const charCount = document.getElementById("charCount");
+    const spinner = document.getElementById("spinner");
+    const btnLabel = document.getElementById("btnLabel");
+    const submitBtn = document.getElementById("submitBtn");
+    const resultSection = document.getElementById("resultSection");
+    const resultBox = document.getElementById("resultBox");
+    const errorBanner = document.getElementById("errorBanner");
+
+    textarea.addEventListener("input", () => {
+      const len = textarea.value.length;
+      charCount.textContent = `${len} / 4096`;
+      charCount.classList.toggle("warn", len >= 4000);
+    });
+
+    async function summarize() {
+      const text = textarea.value.trim();
+      if (!text) {
+        showError("Please enter some text before summarizing.");
+        return;
+      }
+
+      setLoading(true);
+      hideError();
+      resultSection.style.display = "none";
+
+      try {
+        const res = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.detail || "Something went wrong. Please try again.");
+          return;
+        }
+
+        resultBox.textContent = data.summary;
+        resultSection.style.display = "block";
+      } catch (err) {
+        showError("Network error — could not reach the server. Is it running?");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function setLoading(on) {
+      submitBtn.disabled = on;
+      spinner.style.display = on ? "block" : "none";
+      btnLabel.textContent = on ? "Summarizing…" : "Summarize";
+    }
+
+    function showError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.style.display = "block";
+    }
+
+    function hideError() {
+      errorBanner.style.display = "none";
+    }
+
+    function copyResult() {
+      navigator.clipboard.writeText(resultBox.textContent).then(() => {
+        const btn = document.querySelector(".copy-btn");
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

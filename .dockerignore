@@ -1,0 +1,19 @@
+# Exclude training artifacts — only model_trainer/ is needed for inference
+artifacts/data_ingestion/
+artifacts/data_transformation/
+artifacts/model_evaluation/
+
+# Dev and research files
+research/
+logs/
+*.ipynb
+.git/
+.github/
+tests/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
