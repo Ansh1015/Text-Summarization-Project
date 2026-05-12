@@ -3,73 +3,192 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Text Summarizer</title>
+  <title>SummarAI — Text Summarizer</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --blue:    #2563eb;
+      --blue-dk: #1d4ed8;
+      --green:   #059669;
+      --red:     #dc2626;
+      --gray-50: #f8fafc;
+      --gray-100:#f1f5f9;
+      --gray-200:#e2e8f0;
+      --gray-400:#94a3b8;
+      --gray-600:#475569;
+      --gray-800:#1e293b;
+      --gray-900:#0f172a;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f0f2f5;
+      background: var(--gray-50);
       min-height: 100vh;
+      color: var(--gray-800);
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+      padding: 1.25rem 2rem;
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 2rem 1rem;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    }
+    .logo { display: flex; align-items: center; gap: 0.65rem; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--blue);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .logo-text { color: #fff; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-text span { color: #60a5fa; }
+    .header-tag {
+      background: rgba(255,255,255,0.1);
+      color: #94a3b8;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 99px;
+      border: 1px solid rgba(255,255,255,0.15);
     }
 
+    /* ── Main layout ── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .panel-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 768px) {
+      .panel-row { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ── */
     .card {
       background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
-      padding: 2rem;
-      width: 100%;
-      max-width: 720px;
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+      overflow: hidden;
     }
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--gray-600);
+    }
+    .card-body { padding: 1.25rem; }
 
-    h1 { font-size: 1.6rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.35rem; }
-    .subtitle { color: #6b7280; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    /* ── Text type chips ── */
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+    .chip {
+      padding: 0.3rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      border: 1.5px solid var(--gray-200);
+      color: var(--gray-600);
+      cursor: pointer;
+      transition: all 0.15s;
+      background: #fff;
+      user-select: none;
+    }
+    .chip:hover { border-color: var(--blue); color: var(--blue); }
+    .chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
-    label { display: block; font-weight: 600; font-size: 0.9rem; color: #374151; margin-bottom: 0.4rem; }
-    .hint { font-size: 0.8rem; color: #9ca3af; margin-bottom: 0.5rem; }
-
+    /* ── Textarea ── */
     textarea {
       width: 100%;
-      min-height: 180px;
-      padding: 0.75rem 1rem;
-      border: 1.5px solid #d1d5db;
-      border-radius: 8px;
+      min-height: 240px;
+      padding: 0.85rem 1rem;
+      border: 1.5px solid var(--gray-200);
+      border-radius: 10px;
       font-size: 0.95rem;
+      line-height: 1.6;
       resize: vertical;
-      transition: border-color 0.2s;
       font-family: inherit;
+      color: var(--gray-800);
+      transition: border-color 0.2s;
     }
-    textarea:focus { outline: none; border-color: #4f46e5; }
+    textarea:focus { outline: none; border-color: var(--blue); }
+    textarea::placeholder { color: var(--gray-400); }
 
-    .char-count { text-align: right; font-size: 0.78rem; color: #9ca3af; margin-top: 0.3rem; margin-bottom: 1rem; }
-    .char-count.warn { color: #ef4444; }
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--gray-400);
+    }
+    .stats-bar .warn { color: var(--red); }
 
-    button {
+    /* ── Length selector ── */
+    .length-row {
+      display: flex;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .len-btn {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1.5px solid var(--gray-200);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--gray-600);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .len-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .len-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .len-label { font-size: 0.72rem; font-weight: 400; display: block; margin-top: 1px; opacity: 0.8; }
+
+    /* ── Summarize button ── */
+    .summarize-btn {
       width: 100%;
-      padding: 0.75rem;
-      background: #4f46e5;
+      padding: 0.85rem;
+      background: var(--blue);
       color: #fff;
       border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
+      border-radius: 10px;
+      font-size: 0.97rem;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      transition: background 0.2s, opacity 0.2s;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.2px;
     }
-    button:hover:not(:disabled) { background: #4338ca; }
-    button:disabled { opacity: 0.65; cursor: not-allowed; }
+    .summarize-btn:hover:not(:disabled) { background: var(--blue-dk); transform: translateY(-1px); }
+    .summarize-btn:active:not(:disabled) { transform: translateY(0); }
+    .summarize-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
     .spinner {
-      width: 18px; height: 18px;
-      border: 2.5px solid rgba(255,255,255,0.4);
+      width: 17px; height: 17px;
+      border: 2.5px solid rgba(255,255,255,0.35);
       border-top-color: #fff;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
@@ -77,108 +196,266 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .result-section { margin-top: 1.5rem; display: none; }
-    .result-label {
-      font-weight: 600; font-size: 0.9rem; color: #374151;
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 0.5rem;
+    /* ── Output panel ── */
+    .placeholder {
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      color: var(--gray-400);
+      text-align: center;
+      padding: 2rem;
     }
-    .copy-btn {
-      background: #f3f4f6; color: #374151;
-      border: 1px solid #d1d5db;
-      padding: 0.25rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 500;
-      cursor: pointer;
-      width: auto;
-    }
-    .copy-btn:hover { background: #e5e7eb; }
+    .placeholder-icon { font-size: 2.5rem; opacity: 0.4; }
+    .placeholder p { font-size: 0.9rem; }
 
-    .result-box {
-      background: #f9fafb;
-      border: 1.5px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 1rem;
-      font-size: 0.95rem;
-      line-height: 1.6;
-      color: #111827;
+    .result-content { display: none; }
+
+    .summary-text {
+      min-height: 100px;
+      font-size: 0.97rem;
+      line-height: 1.75;
+      color: var(--gray-800);
       white-space: pre-wrap;
       word-break: break-word;
+      padding: 1rem;
+      background: var(--gray-50);
+      border: 1.5px solid var(--gray-200);
+      border-radius: 10px;
     }
 
+    /* ── Compression stats ── */
+    .compression-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .stat-box {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--blue);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--gray-400);
+      margin-top: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 0.28rem 0.7rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--gray-600);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .copy-btn:hover { background: var(--gray-200); }
+
+    /* ── Error banner ── */
     .error-banner {
       margin-top: 1rem;
       padding: 0.75rem 1rem;
       background: #fef2f2;
       border: 1px solid #fecaca;
       border-radius: 8px;
-      color: #dc2626;
-      font-size: 0.9rem;
+      color: var(--red);
+      font-size: 0.88rem;
       display: none;
     }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.78rem;
+      color: var(--gray-400);
+      border-top: 1px solid var(--gray-200);
+      margin-top: 2rem;
+    }
+    footer strong { color: var(--gray-600); }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Text Summarizer</h1>
-    <p class="subtitle">Fine-tuned PEGASUS on SAMSum — paste a conversation or text below to generate a concise summary.</p>
 
-    <label for="inputText">Input Text</label>
-    <p class="hint">Min 1 character · Max 4,096 characters</p>
-    <textarea id="inputText" placeholder="Paste a conversation or article here…" maxlength="4096"></textarea>
-    <div class="char-count" id="charCount">0 / 4096</div>
-
-    <button id="submitBtn" onclick="summarize()">
-      <span class="spinner" id="spinner"></span>
-      <span id="btnLabel">Summarize</span>
-    </button>
-
-    <div class="error-banner" id="errorBanner"></div>
-
-    <div class="result-section" id="resultSection">
-      <div class="result-label">
-        Summary
-        <button class="copy-btn" onclick="copyResult()">Copy</button>
-      </div>
-      <div class="result-box" id="resultBox"></div>
+  <header>
+    <div class="logo">
+      <div class="logo-icon">&#9997;</div>
+      <span class="logo-text">Summar<span>AI</span></span>
     </div>
-  </div>
+    <span class="header-tag">BART · General Purpose</span>
+  </header>
+
+  <main>
+    <div class="panel-row">
+
+      <!-- ── Input Panel ── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Input Text</span>
+        </div>
+        <div class="card-body">
+
+          <div class="chips" id="typeChips">
+            <span class="chip active" data-type="any">Any Text</span>
+            <span class="chip" data-type="article">Article</span>
+            <span class="chip" data-type="email">Email</span>
+            <span class="chip" data-type="research">Research</span>
+            <span class="chip" data-type="chat">Chat</span>
+          </div>
+
+          <textarea
+            id="inputText"
+            placeholder="Paste any text here — articles, emails, research papers, conversations, reports…"
+            maxlength="4096"
+          ></textarea>
+
+          <div class="stats-bar">
+            <span id="wordCountIn">0 words</span>
+            <span id="charCount">0 / 4096</span>
+          </div>
+
+          <div class="length-row">
+            <button class="len-btn" data-len="brief">
+              Brief
+              <span class="len-label">~1-2 sentences</span>
+            </button>
+            <button class="len-btn active" data-len="standard">
+              Standard
+              <span class="len-label">~3-4 sentences</span>
+            </button>
+            <button class="len-btn" data-len="detailed">
+              Detailed
+              <span class="len-label">~5-6 sentences</span>
+            </button>
+          </div>
+
+          <button class="summarize-btn" id="submitBtn" onclick="summarize()">
+            <span class="spinner" id="spinner"></span>
+            <span id="btnLabel">Summarize</span>
+          </button>
+
+          <div class="error-banner" id="errorBanner"></div>
+
+        </div>
+      </div>
+
+      <!-- ── Output Panel ── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Summary</span>
+          <button class="copy-btn" id="copyBtn" onclick="copyResult()" style="display:none">
+            &#128203; Copy
+          </button>
+        </div>
+        <div class="card-body">
+
+          <div class="placeholder" id="placeholder">
+            <div class="placeholder-icon">&#128196;</div>
+            <p>Your summary will appear here.<br>Paste text on the left and click <strong>Summarize</strong>.</p>
+          </div>
+
+          <div class="result-content" id="resultContent">
+            <div class="summary-text" id="summaryText"></div>
+            <div class="compression-stats" id="compressionStats">
+              <div class="stat-box">
+                <div class="stat-value" id="statWordsIn">—</div>
+                <div class="stat-label">Words in</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-value" id="statWordsOut">—</div>
+                <div class="stat-label">Words out</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-value" id="statCompression">—</div>
+                <div class="stat-label">Reduced by</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    Powered by <strong>facebook/bart-large-cnn</strong> · Fine-tuned on SAMSum · Runs locally
+  </footer>
 
   <script>
-    const textarea = document.getElementById("inputText");
-    const charCount = document.getElementById("charCount");
-    const spinner = document.getElementById("spinner");
-    const btnLabel = document.getElementById("btnLabel");
-    const submitBtn = document.getElementById("submitBtn");
-    const resultSection = document.getElementById("resultSection");
-    const resultBox = document.getElementById("resultBox");
+    const textarea    = document.getElementById("inputText");
+    const charCount   = document.getElementById("charCount");
+    const wordCountIn = document.getElementById("wordCountIn");
+    const spinner     = document.getElementById("spinner");
+    const btnLabel    = document.getElementById("btnLabel");
+    const submitBtn   = document.getElementById("submitBtn");
     const errorBanner = document.getElementById("errorBanner");
+    const placeholder = document.getElementById("placeholder");
+    const resultContent = document.getElementById("resultContent");
+    const summaryText = document.getElementById("summaryText");
+    const copyBtn     = document.getElementById("copyBtn");
 
+    let selectedLength = "standard";
+
+    // ── Textarea counter ──
     textarea.addEventListener("input", () => {
-      const len = textarea.value.length;
+      const len   = textarea.value.length;
+      const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
       charCount.textContent = `${len} / 4096`;
       charCount.classList.toggle("warn", len >= 4000);
+      wordCountIn.textContent = `${words} word${words !== 1 ? "s" : ""}`;
     });
 
+    // ── Text type chips ──
+    document.getElementById("typeChips").addEventListener("click", e => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+    });
+
+    // ── Length selector ──
+    document.querySelectorAll(".len-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".len-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedLength = btn.dataset.len;
+      });
+    });
+
+    // ── Summarize ──
     async function summarize() {
       const text = textarea.value.trim();
-      if (!text) {
-        showError("Please enter some text before summarizing.");
-        return;
-      }
+      if (!text) { showError("Please paste some text first."); return; }
 
       setLoading(true);
       hideError();
-      resultSection.style.display = "none";
 
       try {
-        const res = await fetch("/predict", {
-          method: "POST",
+        const res  = await fetch("/predict", {
+          method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body:    JSON.stringify({ text, length: selectedLength }),
         });
-
         const data = await res.json();
 
         if (!res.ok) {
@@ -186,35 +463,49 @@
           return;
         }
 
-        resultBox.textContent = data.summary;
-        resultSection.style.display = "block";
-      } catch (err) {
-        showError("Network error — could not reach the server. Is it running?");
+        showResult(data);
+      } catch {
+        showError("Network error — could not reach the server.");
       } finally {
         setLoading(false);
       }
     }
 
+    function showResult(data) {
+      summaryText.textContent = data.summary;
+
+      const wordsIn  = data.word_count_in;
+      const wordsOut = data.word_count_out;
+      const pct      = wordsIn > 0 ? Math.round((1 - wordsOut / wordsIn) * 100) : 0;
+
+      document.getElementById("statWordsIn").textContent  = wordsIn;
+      document.getElementById("statWordsOut").textContent = wordsOut;
+      document.getElementById("statCompression").textContent = `${pct}%`;
+
+      placeholder.style.display    = "none";
+      resultContent.style.display  = "block";
+      copyBtn.style.display        = "flex";
+    }
+
     function setLoading(on) {
-      submitBtn.disabled = on;
-      spinner.style.display = on ? "block" : "none";
-      btnLabel.textContent = on ? "Summarizing…" : "Summarize";
+      submitBtn.disabled         = on;
+      spinner.style.display      = on ? "block" : "none";
+      btnLabel.textContent       = on ? "Summarizing…" : "Summarize";
     }
 
     function showError(msg) {
-      errorBanner.textContent = msg;
-      errorBanner.style.display = "block";
+      errorBanner.textContent    = msg;
+      errorBanner.style.display  = "block";
     }
 
     function hideError() {
-      errorBanner.style.display = "none";
+      errorBanner.style.display  = "none";
     }
 
     function copyResult() {
-      navigator.clipboard.writeText(resultBox.textContent).then(() => {
-        const btn = document.querySelector(".copy-btn");
-        btn.textContent = "Copied!";
-        setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+      navigator.clipboard.writeText(summaryText.textContent).then(() => {
+        copyBtn.textContent = "✓ Copied!";
+        setTimeout(() => { copyBtn.innerHTML = "&#128203; Copy"; }, 2000);
       });
     }
   </script>

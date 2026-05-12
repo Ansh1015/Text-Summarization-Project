@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from textSummarizer.logging import logger
 
-_MODEL_PATH = Path("artifacts/model_trainer/pegasus-samsum-model")
+_MODEL_PATH = Path("artifacts/model_trainer/bart-samsum-model")
 _TOKENIZER_PATH = Path("artifacts/model_trainer/tokenizer")
 
 _prediction_pipeline = None
@@ -33,8 +34,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Text Summarizer API",
-    description="Fine-tuned PEGASUS model on SAMSum dataset for conversation summarization.",
-    version="0.0.0",
+    description="Fine-tuned BART model for general-purpose text summarization.",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -43,10 +44,13 @@ templates = Jinja2Templates(directory="templates")
 
 class PredictRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=4096, description="Text to summarize")
+    length: str = Field(default="standard", pattern="^(brief|standard|detailed)$")
 
 
 class PredictResponse(BaseModel):
     summary: str
+    word_count_in: int
+    word_count_out: int
     error: str | None = None
 
 
@@ -67,8 +71,13 @@ async def predict(body: PredictRequest):
         )
     try:
         loop = asyncio.get_event_loop()
-        summary = await loop.run_in_executor(None, _prediction_pipeline.predict, body.text)
-        return PredictResponse(summary=summary)
+        fn = functools.partial(_prediction_pipeline.predict, body.text, body.length)
+        summary = await loop.run_in_executor(None, fn)
+        return PredictResponse(
+            summary=summary,
+            word_count_in=len(body.text.split()),
+            word_count_out=len(summary.split()),
+        )
     except Exception as e:
         logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))

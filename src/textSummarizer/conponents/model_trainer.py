@@ -56,7 +56,7 @@ class ModelTrainer:
         logger.info("Starting model training...")
         trainer.train()
 
-        model_save_path = self.config.root_dir / "pegasus-samsum-model"
+        model_save_path = self.config.root_dir / "bart-samsum-model"
         tokenizer_save_path = self.config.root_dir / "tokenizer"
 
         model.save_pretrained(str(model_save_path))

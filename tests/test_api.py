@@ -18,7 +18,7 @@ class TestIndexRoute:
         response = client.get("/")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        assert "Text Summarizer" in response.text
+        assert "SummarAI" in response.text
 
 
 class TestPredictRoute:
@@ -39,7 +39,7 @@ class TestPredictRoute:
         import app as app_module
 
         class _MockPipeline:
-            def predict(self, text: str) -> str:
+            def predict(self, text: str, length: str = "standard") -> str:
                 return f"Summary of: {text[:20]}"
 
         app_module._prediction_pipeline = _MockPipeline()
@@ -49,13 +49,32 @@ class TestPredictRoute:
         assert response.status_code == 200
         data = response.json()
         assert "summary" in data
+        assert "word_count_in" in data
+        assert "word_count_out" in data
         assert len(data["summary"]) > 0
+
+    def test_length_parameter_accepted(self, client):
+        import app as app_module
+
+        class _MockPipeline:
+            def predict(self, text: str, length: str = "standard") -> str:
+                return f"Brief: {text[:10]}"
+
+        app_module._prediction_pipeline = _MockPipeline()
+        for length in ["brief", "standard", "detailed"]:
+            response = client.post("/predict", json={"text": "Some text to summarize here.", "length": length})
+            assert response.status_code == 200
+        app_module._prediction_pipeline = None
+
+    def test_invalid_length_returns_422(self, client):
+        response = client.post("/predict", json={"text": "Some text.", "length": "super-long"})
+        assert response.status_code == 422
 
     def test_unicode_input_does_not_crash(self, client):
         import app as app_module
 
         class _MockPipeline:
-            def predict(self, text: str) -> str:
+            def predict(self, text: str, length: str = "standard") -> str:
                 return "Summary"
 
         app_module._prediction_pipeline = _MockPipeline()
