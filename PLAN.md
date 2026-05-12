@@ -11,7 +11,7 @@ Build a production-ready text summarization application using Hugging Face trans
 3. Fine-tuning is done via `Seq2SeqTrainer` with `google/pegasus-cnn_dailymail` as the base model.
 4. The project exposes a FastAPI web API for inference (not training — training happens offline).
 5. Docker containerizes the inference API (not the training loop).
-6. We target Python 3.8+ compatibility.
+6. We target Python 3.10+ compatibility (3.12 used in development).
 
 ## Architecture
 
@@ -36,7 +36,7 @@ Build a production-ready text summarization application using Hugging Face trans
 │  ├── stage_02_data_transformation.py                        │
 │  ├── stage_03_model_trainer.py                              │
 │  ├── stage_04_model_evaluation.py                           │
-│  └── stage_05_prediction.py                                 │
+│  └── prediction.py          (inference pipeline)            │
 ├─────────────────────────────────────────────────────────────┤
 │  Web API (FastAPI + Jinja2)                                  │
 │  ├── app.py          (FastAPI routes: GET / POST /predict)  │
@@ -180,7 +180,7 @@ model_evaluation:
 ```yaml
 TrainingArguments:
   num_train_epochs: 1
-  warmup_steps: 500
+  warmup_steps: 100
   per_device_train_batch_size: 1
   weight_decay: 0.01
   logging_steps: 10
@@ -216,18 +216,15 @@ TrainingArguments:
 - Monitoring / observability
 - Rate limiting
 
-## What already exists
-- `src/textSummarizer/` package skeleton (all `__init__.py` files, empty)
-- `src/textSummarizer/utils/common.py` (empty)
-- `src/textSummarizer/config/configuration.py` (empty)
-- `config/config.yaml` (empty)
-- `params.yaml` (empty)
-- `main.py` (empty)
-- `app.py` (empty)
-- `research/trials.ipynb` (empty)
-- `setup.py` (complete — package installation configured)
-- `requirements.txt` (complete — all 21 deps listed)
-- `.gitignore` (standard Python)
-- `Dockerfile` (empty)
+## What was implemented
+All files are fully implemented. Key decisions made during build:
+- `constants/__init__.py` anchors paths to `Path(__file__)` — not CWD — so the package works from any directory
+- `app.py` loads the model once at startup via FastAPI `lifespan` context (not per-request)
+- `POST /predict` wraps `model.generate()` in `asyncio.run_in_executor` to avoid blocking the event loop
+- Pydantic input validation enforces `min_length=1, max_length=4096`
+- `data_transformation.py` uses `text_target=` tokenizer parameter (transformers 5.x API)
+- `templates/index.html` uses JS `fetch` (no page reload) with loading spinner, error banner, and copy button
+- `warmup_steps` reduced from 500 → 100 (500 consumed >50% of epoch-1 training data before LR scheduling started)
+- `Dockerfile` uses Python 3.10-slim with `.dockerignore` excluding training artifacts (~GB)
 
 <!-- /autoplan restore point: will be written after plan review -->

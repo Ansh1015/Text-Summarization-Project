@@ -8,7 +8,7 @@ A portfolio NLP project that fine-tunes **PEGASUS** (`google/pegasus-cnn_dailyma
 
 | Requirement | Version |
 |---|---|
-| Python | 3.10+ |
+| Python | 3.10+ (3.12 recommended) |
 | pip | 23+ |
 | Disk space | ~5 GB (model weights + dataset) |
 | RAM | 8 GB minimum (16 GB recommended for training) |
@@ -107,7 +107,7 @@ docker run -p 8080:8080 text-summarizer
 Text-Summarization-Project/
 ├── src/textSummarizer/
 │   ├── logging/          → custom logger → logs/running_logs.log
-│   ├── constants/        → CONFIG_FILE_PATH, PARAMS_FILE_PATH
+│   ├── constants/        → CONFIG_FILE_PATH, PARAMS_FILE_PATH (anchored to __file__)
 │   ├── entity/           → frozen dataclasses for each stage config
 │   ├── utils/common.py   → read_yaml, create_directories, get_size
 │   ├── config/           → ConfigurationManager (loads YAML → dataclasses)
@@ -115,11 +115,19 @@ Text-Summarization-Project/
 │   └── pipeline/         → stage orchestrators + prediction.py
 ├── config/config.yaml    → artifact paths, model name
 ├── params.yaml           → Seq2SeqTrainingArguments hyperparameters
-├── main.py               → runs all 4 training stages
-├── app.py                → FastAPI app (model loads at startup)
-├── templates/index.html  → web UI
-├── tests/                → unit + integration tests
-└── Dockerfile            → inference-only container
+├── main.py               → runs all 4 training stages sequentially
+├── app.py                → FastAPI app (model loads at startup via lifespan)
+├── templates/index.html  → web UI (JS fetch, loading spinner, error handling)
+├── tests/                → 13 unit + integration tests
+├── research/trials.ipynb → experimentation notebook
+├── .github/workflows/    → CI pipeline (pytest + ruff)
+├── Dockerfile            → inference-only container (Python 3.10-slim)
+├── .dockerignore         → excludes training artifacts from image
+├── ARCHITECTURE.md       → system design and component relationships
+├── CONTRIBUTING.md       → dev setup and contribution guide
+├── CHANGELOG.md          → version history
+├── PLAN.md               → implementation plan and design decisions
+└── TODOS.md              → deferred scope and future work
 ```
 
 > **Note:** The `conponents/` directory has a typo (missing 'm') — this matches the original project scaffold and is kept intentionally.
@@ -165,6 +173,29 @@ Typical results for PEGASUS fine-tuned on SAMSum (1 epoch, CPU):
 |---|---|---|---|
 | PEGASUS fine-tuned | ~0.42 | ~0.20 | ~0.34 |
 | PEGASUS zero-shot | ~0.32 | ~0.14 | ~0.28 |
+
+---
+
+## What this project actually is
+
+This is a **fine-tuning project**, not an AI wrapper. When you run `python main.py`:
+
+1. The SAMSum dataset (~14k real conversations) is downloaded from HuggingFace
+2. Each conversation is tokenized using the PEGASUS tokenizer
+3. The `google/pegasus-cnn_dailymail` model weights are **actually updated** via `Seq2SeqTrainer`
+4. The fine-tuned model is saved locally — no cloud API needed for inference
+
+After training, the model runs **entirely on your machine**. Zero external API calls.
+
+---
+
+## Further Reading
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system design, component relationships, data flow
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, running tests, making changes
+- [CHANGELOG.md](CHANGELOG.md) — version history
+- [PLAN.md](PLAN.md) — original implementation plan and design decisions
+- [TODOS.md](TODOS.md) — deferred scope and future work
 
 ---
 
