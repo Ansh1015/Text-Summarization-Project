@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import torch
@@ -19,8 +20,12 @@ class ModelTrainer:
         self.config = config
 
     def train(self):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Training on device: {device}")
+        force_cpu = os.environ.get("TS_FORCE_CPU", "").lower() in {"1", "true", "yes"}
+        if force_cpu:
+            device = "cpu"
+        else:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Training on device: {device} (TS_FORCE_CPU={force_cpu})")
 
         tokenizer = AutoTokenizer.from_pretrained(self.config.model_ckpt)
         model = AutoModelForSeq2SeqLM.from_pretrained(self.config.model_ckpt).to(device)
@@ -37,17 +42,19 @@ class ModelTrainer:
             per_device_eval_batch_size=self.config.per_device_train_batch_size,
             weight_decay=self.config.weight_decay,
             logging_steps=self.config.logging_steps,
-            evaluation_strategy=self.config.evaluation_strategy,
+            eval_strategy=self.config.evaluation_strategy,
             eval_steps=self.config.eval_steps,
             save_steps=int(self.config.save_steps),
             gradient_accumulation_steps=self.config.gradient_accumulation_steps,
             predict_with_generate=True,
+            gradient_checkpointing=True,
+            use_cpu=force_cpu,
         )
 
         trainer = Seq2SeqTrainer(
             model=model,
             args=trainer_args,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             data_collator=data_collator,
             train_dataset=dataset_samsum_pt["train"],
             eval_dataset=dataset_samsum_pt["validation"],

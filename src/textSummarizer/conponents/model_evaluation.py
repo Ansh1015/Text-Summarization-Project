@@ -38,21 +38,22 @@ def _calculate_metric_on_test_ds(
             article_batch,
             max_length=1024,
             truncation=True,
-            padding="max_length",
+            padding=True,
             return_tensors="pt",
         )
         summaries = model.generate(
             input_ids=inputs["input_ids"].to(device),
             attention_mask=inputs["attention_mask"].to(device),
+            generation_config=model.generation_config,
             length_penalty=0.8,
             num_beams=8,
             max_length=128,
+            early_stopping=True,
         )
         decoded_summaries = [
             tokenizer.decode(s, skip_special_tokens=True, clean_up_tokenization_spaces=True)
             for s in summaries
         ]
-        decoded_summaries = [d.replace("", " ") for d in decoded_summaries]
         metric.add_batch(predictions=decoded_summaries, references=target_batch)
 
     return metric.compute()

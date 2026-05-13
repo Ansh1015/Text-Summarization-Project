@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SummarAI — Text Summarizer</title>
+  <script>
+    (function () {
+      var saved = localStorage.getItem("theme");
+      var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      var theme = saved || (prefersDark ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -19,6 +27,22 @@
       --gray-600:#475569;
       --gray-800:#1e293b;
       --gray-900:#0f172a;
+      --card-bg: #ffffff;
+      --err-bg:  #fef2f2;
+      --err-bd:  #fecaca;
+    }
+
+    [data-theme="dark"] {
+      --gray-50: #0f172a;
+      --gray-100:#1a2336;
+      --gray-200:#25324a;
+      --gray-400:#7a8aa3;
+      --gray-600:#cbd5e1;
+      --gray-800:#e5edf7;
+      --gray-900:#020617;
+      --card-bg: #121a2b;
+      --err-bg:  #2b1416;
+      --err-bd:  #5b2024;
     }
 
     body {
@@ -26,6 +50,7 @@
       background: var(--gray-50);
       min-height: 100vh;
       color: var(--gray-800);
+      transition: background-color 0.18s, color 0.18s;
     }
 
     /* ── Header ── */
@@ -47,6 +72,7 @@
     }
     .logo-text { color: #fff; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
     .logo-text span { color: #60a5fa; }
+    .header-right { display: flex; align-items: center; gap: 0.6rem; }
     .header-tag {
       background: rgba(255,255,255,0.1);
       color: #94a3b8;
@@ -55,6 +81,18 @@
       border-radius: 99px;
       border: 1px solid rgba(255,255,255,0.15);
     }
+    .theme-toggle {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .theme-toggle:hover { background: rgba(255,255,255,0.18); }
 
     /* ── Main layout ── */
     main {
@@ -75,7 +113,7 @@
 
     /* ── Cards ── */
     .card {
-      background: #fff;
+      background: var(--card-bg);
       border-radius: 14px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
       overflow: hidden;
@@ -107,7 +145,7 @@
       color: var(--gray-600);
       cursor: pointer;
       transition: all 0.15s;
-      background: #fff;
+      background: var(--card-bg);
       user-select: none;
     }
     .chip:hover { border-color: var(--blue); color: var(--blue); }
@@ -125,7 +163,8 @@
       resize: vertical;
       font-family: inherit;
       color: var(--gray-800);
-      transition: border-color 0.2s;
+      background: var(--card-bg);
+      transition: border-color 0.2s, background-color 0.18s, color 0.18s;
     }
     textarea:focus { outline: none; border-color: var(--blue); }
     textarea::placeholder { color: var(--gray-400); }
@@ -152,7 +191,7 @@
       padding: 0.5rem;
       border: 1.5px solid var(--gray-200);
       border-radius: 8px;
-      background: #fff;
+      background: var(--card-bg);
       color: var(--gray-600);
       font-size: 0.82rem;
       font-weight: 600;
@@ -274,8 +313,8 @@
     .error-banner {
       margin-top: 1rem;
       padding: 0.75rem 1rem;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
+      background: var(--err-bg);
+      border: 1px solid var(--err-bd);
       border-radius: 8px;
       color: var(--red);
       font-size: 0.88rem;
@@ -301,7 +340,10 @@
       <div class="logo-icon">&#9997;</div>
       <span class="logo-text">Summar<span>AI</span></span>
     </div>
-    <span class="header-tag">BART · General Purpose</span>
+    <div class="header-right">
+      <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">🌙</button>
+      <span class="header-tag">BART · General Purpose</span>
+    </div>
   </header>
 
   <main>
@@ -325,12 +367,12 @@
           <textarea
             id="inputText"
             placeholder="Paste any text here — articles, emails, research papers, conversations, reports…"
-            maxlength="4096"
+            maxlength="{{ max_chars }}"
           ></textarea>
 
           <div class="stats-bar">
-            <span id="wordCountIn">0 words</span>
-            <span id="charCount">0 / 4096</span>
+            <span id="wordCountIn">0 / {{ max_words }} words</span>
+            <span id="charCount">0 / {{ max_chars }}</span>
           </div>
 
           <div class="length-row">
@@ -415,22 +457,53 @@
     const copyBtn     = document.getElementById("copyBtn");
 
     let selectedLength = "standard";
+    const MAX_CHARS = {{ max_chars }};
+    const MAX_WORDS = {{ max_words }};
 
-    // ── Textarea counter ──
-    textarea.addEventListener("input", () => {
+    // ── Theme toggle ──
+    const themeBtn = document.getElementById("themeToggle");
+    function syncThemeIcon() {
+      const t = document.documentElement.getAttribute("data-theme");
+      themeBtn.textContent = t === "dark" ? "☀️" : "🌙";
+      themeBtn.setAttribute("aria-label", t === "dark" ? "Switch to light theme" : "Switch to dark theme");
+    }
+    themeBtn.addEventListener("click", () => {
+      const cur = document.documentElement.getAttribute("data-theme");
+      const next = cur === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      syncThemeIcon();
+    });
+    syncThemeIcon();
+
+    // ── Textarea counter + button gate ──
+    function updateCounters() {
       const len   = textarea.value.length;
       const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
-      charCount.textContent = `${len} / 4096`;
-      charCount.classList.toggle("warn", len >= 4000);
-      wordCountIn.textContent = `${words} word${words !== 1 ? "s" : ""}`;
-    });
+      charCount.textContent = `${len} / ${MAX_CHARS}`;
+      charCount.classList.toggle("warn", len >= MAX_CHARS * 0.95);
+      wordCountIn.textContent = `${words} / ${MAX_WORDS} words`;
+      wordCountIn.classList.toggle("warn", words > MAX_WORDS);
+      submitBtn.disabled = words === 0 || words > MAX_WORDS;
+    }
+    textarea.addEventListener("input", updateCounters);
+    updateCounters();
 
     // ── Text type chips ──
+    const TYPE_PLACEHOLDERS = {
+      any:      "Paste any text here — articles, emails, research papers, conversations, reports…",
+      article:  "Paste a news article, blog post, or long-form piece…",
+      email:    "Paste an email thread or a single message…",
+      research: "Paste a research paper abstract, section, or full text…",
+      chat:     "Paste a chat conversation (e.g., Hannah: Hi\\nAmanda: Hey)…",
+    };
     document.getElementById("typeChips").addEventListener("click", e => {
       const chip = e.target.closest(".chip");
       if (!chip) return;
       document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
       chip.classList.add("active");
+      const hint = TYPE_PLACEHOLDERS[chip.dataset.type];
+      if (hint) textarea.placeholder = hint;
     });
 
     // ── Length selector ──
@@ -446,6 +519,11 @@
     async function summarize() {
       const text = textarea.value.trim();
       if (!text) { showError("Please paste some text first."); return; }
+      const words = text.split(/\s+/).length;
+      if (words > MAX_WORDS) {
+        showError(`Text is ${words} words — limit is ${MAX_WORDS}. Trim before summarizing.`);
+        return;
+      }
 
       setLoading(true);
       hideError();
@@ -459,7 +537,13 @@
         const data = await res.json();
 
         if (!res.ok) {
-          showError(data.detail || "Something went wrong. Please try again.");
+          const detail = data.detail;
+          let msg;
+          if (typeof detail === "string") msg = detail;
+          else if (Array.isArray(detail)) msg = detail.map(d => d.msg || JSON.stringify(d)).join("; ");
+          else if (detail) msg = JSON.stringify(detail);
+          else msg = "Something went wrong. Please try again.";
+          showError(msg);
           return;
         }
 
@@ -496,6 +580,9 @@
     function showError(msg) {
       errorBanner.textContent    = msg;
       errorBanner.style.display  = "block";
+      resultContent.style.display = "none";
+      placeholder.style.display  = "flex";
+      copyBtn.style.display      = "none";
     }
 
     function hideError() {

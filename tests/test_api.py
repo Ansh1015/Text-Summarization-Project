@@ -6,10 +6,9 @@ from fastapi.testclient import TestClient
 def client():
     """Create test client with prediction pipeline mocked out."""
     import app as app_module
-    app_module._prediction_pipeline = None
-
     from app import app
     with TestClient(app, raise_server_exceptions=False) as c:
+        app_module._prediction_pipeline = None
         yield c
 
 
@@ -27,8 +26,22 @@ class TestPredictRoute:
         assert response.status_code == 422
 
     def test_text_too_long_returns_422(self, client):
-        response = client.post("/predict", json={"text": "x" * 4097})
+        response = client.post("/predict", json={"text": "x" * 8001})
         assert response.status_code == 422
+
+    def test_word_limit_returns_422(self, client):
+        import app as app_module
+
+        class _MockPipeline:
+            def predict(self, text: str, length: str = "standard") -> str:
+                return "ok"
+
+        app_module._prediction_pipeline = _MockPipeline()
+        text = " ".join(["word"] * 1001)
+        response = client.post("/predict", json={"text": text})
+        app_module._prediction_pipeline = None
+        assert response.status_code == 422
+        assert "1000-word" in response.json()["detail"]
 
     def test_model_not_loaded_returns_503(self, client):
         response = client.post("/predict", json={"text": "Hello world, this is a test."})
