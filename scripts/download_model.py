@@ -19,14 +19,14 @@ TOKENIZER_DIR = Path("artifacts/model_trainer/tokenizer")
 
 def main() -> None:
     MODEL_DIR.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Downloading {REPO} → {MODEL_DIR} ...")
+    print(f"Downloading {REPO} -> {MODEL_DIR} ...")
     snapshot_download(repo_id=REPO, local_dir=str(MODEL_DIR))
 
     if TOKENIZER_DIR.exists() or TOKENIZER_DIR.is_symlink():
         TOKENIZER_DIR.unlink() if TOKENIZER_DIR.is_symlink() else None
     if not TOKENIZER_DIR.exists():
         TOKENIZER_DIR.symlink_to(MODEL_DIR.resolve())
-    print(f"Done. Tokenizer dir symlinked → {TOKENIZER_DIR}")
+    print(f"Done. Tokenizer dir symlinked -> {TOKENIZER_DIR}")
     print("Now run: uvicorn app:app --host 0.0.0.0 --port 8080")
 
 
