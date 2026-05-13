@@ -6,10 +6,9 @@ from fastapi.testclient import TestClient
 def client():
     """Create test client with prediction pipeline mocked out."""
     import app as app_module
-    app_module._prediction_pipeline = None
-
     from app import app
     with TestClient(app, raise_server_exceptions=False) as c:
+        app_module._prediction_pipeline = None
         yield c
 
 
