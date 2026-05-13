@@ -529,7 +529,7 @@
       hideError();
 
       try {
-        const res  = await fetch("/predict", {
+        const res  = await fetch("/v1/predict", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({ text, length: selectedLength }),

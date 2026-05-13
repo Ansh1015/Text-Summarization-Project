@@ -95,3 +95,91 @@ class TestPredictRoute:
         app_module._prediction_pipeline = None
 
         assert response.status_code == 200
+
+
+class TestV1PredictRoute:
+    """Mirrors key TestPredictRoute cases for the versioned endpoint."""
+
+    def test_model_not_loaded_returns_503(self, client):
+        response = client.post("/v1/predict", json={"text": "Hello world, this is a test."})
+        assert response.status_code == 503
+
+    def test_valid_request_with_mock_pipeline(self, client):
+        import app as app_module
+
+        class _MockPipeline:
+            def predict(self, text: str, length: str = "standard") -> str:
+                return f"Summary of: {text[:20]}"
+
+        app_module._prediction_pipeline = _MockPipeline()
+        response = client.post("/v1/predict", json={"text": "This is a long conversation."})
+        app_module._prediction_pipeline = None
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "summary" in data
+        assert "word_count_in" in data
+        assert "word_count_out" in data
+
+    def test_empty_text_returns_422(self, client):
+        response = client.post("/v1/predict", json={"text": ""})
+        assert response.status_code == 422
+
+    def test_invalid_length_returns_422(self, client):
+        response = client.post("/v1/predict", json={"text": "Some text.", "length": "super-long"})
+        assert response.status_code == 422
+
+
+class TestApiAuth:
+    def test_no_auth_required_when_key_not_set(self, client):
+        import app as app_module
+        assert app_module._API_KEY is None
+        # Should reach the pipeline check (503), not auth check (401)
+        response = client.post("/v1/predict", json={"text": "Hello world test."})
+        assert response.status_code == 503
+
+    def test_401_when_wrong_key_sent(self, client):
+        import app as app_module
+        original = app_module._API_KEY
+        app_module._API_KEY = "correct-key"
+        try:
+            response = client.post(
+                "/v1/predict",
+                json={"text": "Hello world test."},
+                headers={"X-API-Key": "wrong-key"},
+            )
+            assert response.status_code == 401
+        finally:
+            app_module._API_KEY = original
+
+    def test_401_when_no_key_sent(self, client):
+        import app as app_module
+        original = app_module._API_KEY
+        app_module._API_KEY = "correct-key"
+        try:
+            response = client.post("/v1/predict", json={"text": "Hello world test."})
+            assert response.status_code == 401
+        finally:
+            app_module._API_KEY = original
+
+    def test_200_when_correct_key(self, client):
+        import app as app_module
+        original_key = app_module._API_KEY
+        app_module._API_KEY = "correct-key"
+
+        class _MockPipeline:
+            def predict(self, text: str, length: str = "standard") -> str:
+                return "Summary"
+
+        original_pipeline = app_module._prediction_pipeline
+        app_module._prediction_pipeline = _MockPipeline()
+        try:
+            response = client.post(
+                "/v1/predict",
+                json={"text": "Some text to summarize here."},
+                headers={"X-API-Key": "correct-key"},
+            )
+            assert response.status_code == 200
+        finally:
+            app_module._API_KEY = original_key
+            app_module._prediction_pipeline = original_pipeline

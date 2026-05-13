@@ -4,15 +4,15 @@ Items explicitly deferred from this implementation. Tackle in a follow-up.
 
 ## High Priority
 
-- [ ] **Publish model checkpoint to HuggingFace Hub** — enables `predict.py` quick-start path without training. Reduces TTHW from hours to 3 minutes.
-- [ ] **API authentication** — add API key header (`X-API-Key`) to `/predict`. Even a simple env-var check prevents abuse if the server is ever public-facing.
-- [ ] **Input rate limiting** — `slowapi` or `uvicorn --limit-concurrency 4` to cap parallel inference workers.
+- [x] **Publish model checkpoint to HuggingFace Hub** — `biggdaddyy/bart-samsum-finetuned` published. `scripts/download_model.py` pulls weights in ~30s. **Completed: v0.2.0**
+- [x] **API authentication** — `X-API-Key` header on `/v1/predict` and `/predict`. Set `API_KEY` env var to enable; unset = dev mode (no key required). **Completed: v0.3.0**
+- [x] **Input rate limiting** — `slowapi` 10 req/min per IP on all `/predict` routes. **Completed: v0.3.0**
 
 ## Medium Priority
 
-- [ ] **Model monitoring / ROUGE drift detection** — log inference inputs/outputs to a file or DB; compare ROUGE against baseline periodically.
-- [ ] **Model versioning** — support loading different checkpoint versions via env var `MODEL_VERSION`.
-- [ ] **API versioning** — prefix routes with `/v1/` before any breaking changes.
+- [x] **Model monitoring / ROUGE drift detection** — inference inputs/outputs logged to `logs/inference.jsonl` (timestamp, words_in, words_out, latency_ms). **Completed: v0.3.0**
+- [x] **Model versioning** — set `MODEL_VERSION` env var to load a different checkpoint directory under `artifacts/model_trainer/`. **Completed: v0.3.0**
+- [x] **API versioning** — routes now live at `/v1/predict`; `/predict` retained as a hidden backward-compat alias. **Completed: v0.3.0**
 
 ## Low Priority
 

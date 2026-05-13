@@ -1,19 +1,62 @@
 import asyncio
 import functools
+import json
+import os
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from fastapi.routing import APIRouter
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from textSummarizer.logging import logger
 
-_MODEL_PATH = Path("artifacts/model_trainer/bart-samsum-model")
+load_dotenv()
+
+# ── Config ──
+_API_KEY: str | None = os.getenv("API_KEY")
+_MODEL_VERSION: str = os.getenv("MODEL_VERSION", "bart-samsum-model")
+_MODEL_PATH = Path("artifacts/model_trainer") / _MODEL_VERSION
 _TOKENIZER_PATH = Path("artifacts/model_trainer/tokenizer")
+_INFERENCE_LOG = Path("logs/inference.jsonl")
 
 _prediction_pipeline = None
+
+# ── Rate limiter ──
+limiter = Limiter(key_func=get_remote_address)
+
+_MAX_CHARS = 8000
+_MAX_WORDS = 1000
+
+
+# ── Auth dependency ──
+async def _check_api_key(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> None:
+    if _API_KEY is None:
+        return  # dev mode: no key required
+    if x_api_key != _API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+
+
+def _log_inference(text: str, summary: str, latency_ms: float) -> None:
+    _INFERENCE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "words_in": len(text.split()),
+        "words_out": len(summary.split()),
+        "latency_ms": round(latency_ms, 1),
+    }
+    with open(_INFERENCE_LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 @asynccontextmanager
@@ -21,13 +64,13 @@ async def lifespan(app: FastAPI):
     global _prediction_pipeline
     if not _MODEL_PATH.exists() or not _TOKENIZER_PATH.exists():
         logger.warning(
-            "Model artifacts not found. Prediction endpoint will return an error. "
-            "Run 'python main.py' to train the model first."
+            "Model artifacts not found. Run 'python scripts/download_model.py' "
+            "or 'python main.py', then restart the server."
         )
     else:
         from textSummarizer.pipeline.prediction import PredictionPipeline
         _prediction_pipeline = PredictionPipeline()
-        logger.info("PredictionPipeline loaded at startup.")
+        logger.info("PredictionPipeline loaded at startup (model: %s).", _MODEL_VERSION)
     yield
     _prediction_pipeline = None
 
@@ -38,12 +81,10 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 templates = Jinja2Templates(directory="templates")
-
-
-_MAX_CHARS = 8000
-_MAX_WORDS = 1000
 
 
 class PredictRequest(BaseModel):
@@ -66,13 +107,12 @@ async def index(request: Request):
     )
 
 
-@app.post("/predict", response_model=PredictResponse)
-async def predict(body: PredictRequest):
+async def _predict_core(body: PredictRequest) -> PredictResponse:
     if _prediction_pipeline is None:
         raise HTTPException(
             status_code=503,
             detail=(
-                "Model is not loaded. Run 'python main.py' to train the model, "
+                "Model is not loaded. Run 'python scripts/download_model.py', "
                 "then restart the server."
             ),
         )
@@ -85,15 +125,47 @@ async def predict(body: PredictRequest):
     try:
         loop = asyncio.get_event_loop()
         fn = functools.partial(_prediction_pipeline.predict, body.text, body.length)
+        t0 = time.monotonic()
         summary = await loop.run_in_executor(None, fn)
+        _log_inference(body.text, summary, (time.monotonic() - t0) * 1000)
         return PredictResponse(
             summary=summary,
             word_count_in=len(body.text.split()),
             word_count_out=len(summary.split()),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── v1 router ──
+v1 = APIRouter(prefix="/v1", tags=["v1"])
+
+
+@v1.post("/predict", response_model=PredictResponse)
+@limiter.limit("10/minute")
+async def predict_v1(
+    request: Request,
+    body: PredictRequest,
+    _: None = Depends(_check_api_key),
+):
+    return await _predict_core(body)
+
+
+app.include_router(v1)
+
+
+# ── Legacy alias (backward-compat, hidden from OpenAPI docs) ──
+@app.post("/predict", response_model=PredictResponse, include_in_schema=False)
+@limiter.limit("10/minute")
+async def predict(
+    request: Request,
+    body: PredictRequest,
+    _: None = Depends(_check_api_key),
+):
+    return await _predict_core(body)
 
 
 if __name__ == "__main__":
