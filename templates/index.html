@@ -459,7 +459,13 @@
         const data = await res.json();
 
         if (!res.ok) {
-          showError(data.detail || "Something went wrong. Please try again.");
+          const detail = data.detail;
+          let msg;
+          if (typeof detail === "string") msg = detail;
+          else if (Array.isArray(detail)) msg = detail.map(d => d.msg || JSON.stringify(d)).join("; ");
+          else if (detail) msg = JSON.stringify(detail);
+          else msg = "Something went wrong. Please try again.";
+          showError(msg);
           return;
         }
 
