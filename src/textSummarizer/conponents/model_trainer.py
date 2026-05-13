@@ -37,17 +37,19 @@ class ModelTrainer:
             per_device_eval_batch_size=self.config.per_device_train_batch_size,
             weight_decay=self.config.weight_decay,
             logging_steps=self.config.logging_steps,
-            evaluation_strategy=self.config.evaluation_strategy,
+            eval_strategy=self.config.evaluation_strategy,
             eval_steps=self.config.eval_steps,
             save_steps=int(self.config.save_steps),
             gradient_accumulation_steps=self.config.gradient_accumulation_steps,
             predict_with_generate=True,
+            gradient_checkpointing=True,
+            use_cpu=True,
         )
 
         trainer = Seq2SeqTrainer(
             model=model,
             args=trainer_args,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             data_collator=data_collator,
             train_dataset=dataset_samsum_pt["train"],
             eval_dataset=dataset_samsum_pt["validation"],
