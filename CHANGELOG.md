@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.2.0] — 2026-05-12
+
+### What's new
+
+**Model upgrade to BART**
+- The summarizer now uses `facebook/bart-large-cnn` instead of `google/pegasus-cnn_dailymail`
+- Trained model saves to `artifacts/model_trainer/bart-samsum-model/`
+- BART produces better-quality summaries on general text; re-run `python main.py` to train with the new model
+
+**Length control — choose how long your summary is**
+- Pass `"length": "brief"`, `"standard"` (default), or `"detailed"` in the request body
+- Brief: up to 64 tokens (4 beams). Standard: up to 128 tokens (8 beams). Detailed: up to 256 tokens (8 beams).
+- Invalid values return 422 with a clear validation error
+
+**Response now includes word counts**
+- Every `/predict` response includes `word_count_in` and `word_count_out` — see your compression ratio at a glance
+
+**SummarAI — redesigned web UI**
+- New split-panel layout: paste text on the left, get the summary on the right (stacks on mobile)
+- Text type chips let you tag input as Any Text, Article, Email, Research, or Chat
+- Length selector (Brief / Standard / Detailed) wired directly to the API `length` field
+- Compression stats show words in, words out, and percentage reduced
+
+**Tests — 15 passing** (was 13)
+- Added: `test_length_parameter_accepted` — all three length values succeed with a mock pipeline
+- Added: `test_invalid_length_returns_422` — garbage length value is rejected before it reaches the model
+
+---
+
 ## [0.1.0] — 2026-05-11
 
 ### What's new

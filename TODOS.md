@@ -19,5 +19,5 @@ Items explicitly deferred from this implementation. Tackle in a follow-up.
 - [ ] **Kubernetes / ECS deployment** — add `k8s/` or `infra/` directory with manifests.
 - [ ] **GPU-optimized training** — multi-GPU via `accelerate`, larger batch sizes.
 - [ ] **Quantization / ONNX export** — reduce inference latency for production.
-- [ ] **CHANGELOG.md + semver** — version bump strategy for package releases.
-- [ ] **LLM API baseline comparison** — 2-day spike comparing zero-shot GPT-4o vs fine-tuned PEGASUS on 50 real SAMSum examples to validate the fine-tuning investment.
+- [x] **CHANGELOG.md + semver** — CHANGELOG exists; app uses semver (currently v0.2.0). **Completed: v0.2.0 (2026-05-12)**
+- [ ] **LLM API baseline comparison** — 2-day spike comparing zero-shot GPT-4o vs fine-tuned BART on 50 real SAMSum examples to validate the fine-tuning investment.

@@ -227,4 +227,11 @@ All files are fully implemented. Key decisions made during build:
 - `warmup_steps` reduced from 500 → 100 (500 consumed >50% of epoch-1 training data before LR scheduling started)
 - `Dockerfile` uses Python 3.10-slim with `.dockerignore` excluding training artifacts (~GB)
 
+## Post-v0.1.0 changes (v0.2.0)
+- **Model switched** from `google/pegasus-cnn_dailymail` → `facebook/bart-large-cnn` (artifacts now at `bart-samsum-model/`)
+- **Length control** added to `PredictionPipeline.predict(text, length)` via `_LENGTH_MAP` (brief/standard/detailed)
+- **API extended**: `PredictRequest` has new `length` field; `PredictResponse` includes `word_count_in` and `word_count_out`
+- **UI redesigned** as SummarAI with split-panel layout, text type chips, length selector, and compression stats
+- **Tests expanded** from 13 → 15 (added length and invalid-length tests)
+
 <!-- /autoplan restore point: will be written after plan review -->

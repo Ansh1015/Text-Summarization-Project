@@ -7,8 +7,8 @@ This guide covers local dev setup, running tests, and making changes.
 ## Setup
 
 ```bash
-git clone https://github.com/Ansh1015/Text-Summarizer-Project.git
-cd Text-Summarizer-Project
+git clone https://github.com/Ansh1015/Text-Summarization-Project.git
+cd Text-Summarization-Project
 
 # Install dependencies
 pip install -r requirements.txt
@@ -33,7 +33,7 @@ python -c "from textSummarizer.config.configuration import ConfigurationManager;
 pytest tests/ -v
 ```
 
-All 13 tests should pass. The test suite does **not** require trained model artifacts — the API tests mock the prediction pipeline.
+All 15 tests should pass. The test suite does **not** require trained model artifacts — the API tests mock the prediction pipeline.
 
 For a quick pass/fail check:
 
@@ -70,14 +70,14 @@ Dockerfile              ← inference-only container
 
 ### Changing the model
 
-Edit `config/config.yaml`:
+The current model is `facebook/bart-large-cnn`. To swap to a different model, edit `config/config.yaml`:
 
 ```yaml
 data_transformation:
-  tokenizer_name: facebook/bart-large-cnn   # ← change here too
+  tokenizer_name: google/pegasus-cnn_dailymail   # ← change here too
 
 model_trainer:
-  model_ckpt: facebook/bart-large-cnn       # ← and here
+  model_ckpt: google/pegasus-cnn_dailymail       # ← and here
 ```
 
 Then delete `artifacts/` and re-run `python main.py` — the tokenizer and model must match.
