@@ -426,11 +426,20 @@
     });
 
     // ── Text type chips ──
+    const TYPE_PLACEHOLDERS = {
+      any:      "Paste any text here — articles, emails, research papers, conversations, reports…",
+      article:  "Paste a news article, blog post, or long-form piece…",
+      email:    "Paste an email thread or a single message…",
+      research: "Paste a research paper abstract, section, or full text…",
+      chat:     "Paste a chat conversation (e.g., Hannah: Hi\\nAmanda: Hey)…",
+    };
     document.getElementById("typeChips").addEventListener("click", e => {
       const chip = e.target.closest(".chip");
       if (!chip) return;
       document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
       chip.classList.add("active");
+      const hint = TYPE_PLACEHOLDERS[chip.dataset.type];
+      if (hint) textarea.placeholder = hint;
     });
 
     // ── Length selector ──
