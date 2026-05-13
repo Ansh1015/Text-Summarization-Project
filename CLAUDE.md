@@ -9,7 +9,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pip install -r requirements.txt
 pip install -e .
 
-# run full 4-stage training pipeline (ingest → tokenize → fine-tune → evaluate)
+# fast path: pull pre-trained weights from HF Hub (~30s, skips training)
+python scripts/download_model.py
+
+# OR: run full 4-stage training pipeline (ingest → tokenize → fine-tune → evaluate)
+# Apple Silicon: TS_FORCE_CPU=1 python main.py  (accelerate auto-MPS OOMs on BART-large)
 python main.py
 
 # serve FastAPI on :8080 (model loaded once at startup via lifespan)
@@ -38,4 +42,6 @@ Two distinct modes share one config layer:
 
 **Model:** `facebook/bart-large-cnn` fine-tuned on SAMSum. Length control (`brief`/`standard`/`detailed`) is passed from `PredictRequest` → `PredictionPipeline.predict(text, length)` — modifies `model.generate()` length params, not separate models. Model dir: `artifacts/model_trainer/bart-samsum-model/`, tokenizer dir: `artifacts/model_trainer/tokenizer/`.
 
-**Note on docs:** README.md and ARCHITECTURE.md still reference PEGASUS in places; the actual model is BART (`facebook/bart-large-cnn`) per `config/config.yaml` and `app.py`. If editing docs, match current code.
+**Pre-trained weights:** `biggdaddyy/bart-samsum-finetuned` on HF Hub (1 epoch on SAMSum, ROUGE-1 ≈ 0.40). `scripts/download_model.py` pulls them into `artifacts/model_trainer/bart-samsum-model/` and symlinks `tokenizer/` to the same dir (HF convention stores both in one repo). Override repo via `HF_MODEL_REPO=...`.
+
+**Note on docs:** ARCHITECTURE.md still references PEGASUS in places; the actual model is BART (`facebook/bart-large-cnn`) per `config/config.yaml` and `app.py`. If editing docs, match current code.
