@@ -42,8 +42,12 @@ app = FastAPI(
 templates = Jinja2Templates(directory="templates")
 
 
+_MAX_CHARS = 8000
+_MAX_WORDS = 1000
+
+
 class PredictRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=4096, description="Text to summarize")
+    text: str = Field(..., min_length=1, max_length=_MAX_CHARS, description="Text to summarize")
     length: str = Field(default="standard", pattern="^(brief|standard|detailed)$")
 
 
@@ -56,7 +60,10 @@ class PredictResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    return templates.TemplateResponse(
+        request, "index.html",
+        {"max_chars": _MAX_CHARS, "max_words": _MAX_WORDS},
+    )
 
 
 @app.post("/predict", response_model=PredictResponse)
@@ -68,6 +75,12 @@ async def predict(body: PredictRequest):
                 "Model is not loaded. Run 'python main.py' to train the model, "
                 "then restart the server."
             ),
+        )
+    word_count = len(body.text.split())
+    if word_count > _MAX_WORDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Text exceeds {_MAX_WORDS}-word limit ({word_count} words supplied).",
         )
     try:
         loop = asyncio.get_event_loop()

@@ -127,7 +127,7 @@
       color: var(--gray-800);
       transition: border-color 0.2s;
     }
-    textarea:focus { outline: none; border-color: var(--blue); }
+    textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
     textarea::placeholder { color: var(--gray-400); }
 
     /* ── Stats bar ── */
@@ -139,7 +139,9 @@
       font-size: 0.78rem;
       color: var(--gray-400);
     }
-    .stats-bar .warn { color: var(--red); }
+    .stats-bar .warn { color: var(--red); font-weight: 600; }
+    .stats-bar .ok   { color: var(--green); }
+    .stats-bar .near { color: #d97706; }
 
     /* ── Length selector ── */
     .length-row {
@@ -167,24 +169,25 @@
     /* ── Summarize button ── */
     .summarize-btn {
       width: 100%;
-      padding: 0.85rem;
-      background: var(--blue);
+      padding: 0.9rem;
+      background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dk) 100%);
       color: #fff;
       border: none;
       border-radius: 10px;
-      font-size: 0.97rem;
+      font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      transition: background 0.2s, transform 0.1s;
+      transition: box-shadow 0.2s, transform 0.1s, filter 0.15s;
       letter-spacing: 0.2px;
+      box-shadow: 0 1px 3px rgba(37,99,235,0.3), 0 4px 12px rgba(37,99,235,0.15);
     }
-    .summarize-btn:hover:not(:disabled) { background: var(--blue-dk); transform: translateY(-1px); }
+    .summarize-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 2px 6px rgba(37,99,235,0.4), 0 6px 18px rgba(37,99,235,0.22); }
     .summarize-btn:active:not(:disabled) { transform: translateY(0); }
-    .summarize-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .summarize-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; filter: grayscale(0.3); }
 
     .spinner {
       width: 17px; height: 17px;
@@ -325,12 +328,12 @@
           <textarea
             id="inputText"
             placeholder="Paste any text here — articles, emails, research papers, conversations, reports…"
-            maxlength="4096"
+            maxlength="{{ max_chars }}"
           ></textarea>
 
           <div class="stats-bar">
-            <span id="wordCountIn">0 words</span>
-            <span id="charCount">0 / 4096</span>
+            <span id="wordCountIn">0 / {{ max_words }} words</span>
+            <span id="charCount">0 / {{ max_chars }}</span>
           </div>
 
           <div class="length-row">
@@ -415,15 +418,30 @@
     const copyBtn     = document.getElementById("copyBtn");
 
     let selectedLength = "standard";
+    const MAX_CHARS = {{ max_chars }};
+    const MAX_WORDS = {{ max_words }};
 
-    // ── Textarea counter ──
-    textarea.addEventListener("input", () => {
+    // ── Textarea counter + button gate ──
+    function updateCounters() {
       const len   = textarea.value.length;
       const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
-      charCount.textContent = `${len} / 4096`;
-      charCount.classList.toggle("warn", len >= 4000);
-      wordCountIn.textContent = `${words} word${words !== 1 ? "s" : ""}`;
-    });
+
+      charCount.textContent = `${len} / ${MAX_CHARS}`;
+      charCount.classList.remove("warn", "near");
+      if (len >= MAX_CHARS) charCount.classList.add("warn");
+      else if (len >= MAX_CHARS * 0.9) charCount.classList.add("near");
+
+      wordCountIn.textContent = `${words} / ${MAX_WORDS} words`;
+      wordCountIn.classList.remove("warn", "near", "ok");
+      if (words === 0) {}
+      else if (words > MAX_WORDS) wordCountIn.classList.add("warn");
+      else if (words >= MAX_WORDS * 0.9) wordCountIn.classList.add("near");
+      else wordCountIn.classList.add("ok");
+
+      submitBtn.disabled = words === 0 || words > MAX_WORDS;
+    }
+    textarea.addEventListener("input", updateCounters);
+    updateCounters();
 
     // ── Text type chips ──
     const TYPE_PLACEHOLDERS = {
@@ -455,6 +473,11 @@
     async function summarize() {
       const text = textarea.value.trim();
       if (!text) { showError("Please paste some text first."); return; }
+      const words = text.split(/\s+/).length;
+      if (words > MAX_WORDS) {
+        showError(`Text is ${words} words — limit is ${MAX_WORDS}. Trim before summarizing.`);
+        return;
+      }
 
       setLoading(true);
       hideError();
@@ -511,6 +534,9 @@
     function showError(msg) {
       errorBanner.textContent    = msg;
       errorBanner.style.display  = "block";
+      resultContent.style.display = "none";
+      placeholder.style.display  = "flex";
+      copyBtn.style.display      = "none";
     }
 
     function hideError() {
