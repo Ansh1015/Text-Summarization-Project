@@ -27,16 +27,31 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### 2. Train the model
+### 2. Get the model weights
 
-This runs all 4 pipeline stages: data ingestion → tokenization → fine-tuning → evaluation.
-**Warning: training takes 2–8 hours on CPU, 20–40 minutes on GPU.**
+You have two options. Pick one.
+
+**Option A — Download the pre-trained fine-tune (recommended, ~30 s)**
+
+Skips training entirely. Pulls a BART fine-tune of SAMSum (1 epoch, ROUGE-1 ≈ 0.40) from Hugging Face Hub.
+
+```bash
+python scripts/download_model.py
+```
+
+This drops weights at `artifacts/model_trainer/bart-samsum-model/` and symlinks the tokenizer dir. Source: [`biggdaddyy/bart-samsum-finetuned`](https://huggingface.co/biggdaddyy/bart-samsum-finetuned). Override with `HF_MODEL_REPO=your-org/your-fork`.
+
+**Option B — Train from scratch**
+
+Runs all 4 pipeline stages: data ingestion → tokenization → fine-tuning → evaluation. **2–8 hours on CPU, 20–40 min on GPU.** Set `TS_FORCE_CPU=1` on Apple Silicon (otherwise `accelerate` grabs MPS and OOMs on BART-large).
 
 ```bash
 python main.py
+# or on macOS:
+TS_FORCE_CPU=1 python main.py
 ```
 
-Artifacts are saved to `artifacts/`:
+Artifacts land in:
 ```
 artifacts/
 ├── data_ingestion/samsum_dataset/
