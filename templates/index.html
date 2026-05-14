@@ -428,7 +428,7 @@
               </div>
               <div class="stat-box">
                 <div class="stat-value" id="statCompression">—</div>
-                <div class="stat-label">Reduced by</div>
+                <div class="stat-label" id="compressionLabel">Reduced by</div>
               </div>
             </div>
           </div>
@@ -564,7 +564,18 @@
 
       document.getElementById("statWordsIn").textContent  = wordsIn;
       document.getElementById("statWordsOut").textContent = wordsOut;
-      document.getElementById("statCompression").textContent = `${pct}%`;
+
+      const comprLabel = document.getElementById("compressionLabel");
+      if (pct > 0) {
+        document.getElementById("statCompression").textContent = `${pct}%`;
+        comprLabel.textContent = "Reduced by";
+      } else if (pct < 0) {
+        document.getElementById("statCompression").textContent = `${Math.abs(pct)}%`;
+        comprLabel.textContent = "Expanded by";
+      } else {
+        document.getElementById("statCompression").textContent = "0%";
+        comprLabel.textContent = "No change";
+      }
 
       placeholder.style.display    = "none";
       resultContent.style.display  = "block";
@@ -591,7 +602,18 @@
 
     function copyResult() {
       navigator.clipboard.writeText(summaryText.textContent).then(() => {
-        copyBtn.textContent = "✓ Copied!";
+        copyBtn.innerHTML = "✓ Copied!";
+        setTimeout(() => { copyBtn.innerHTML = "&#128203; Copy"; }, 2000);
+      }).catch(() => {
+        // Fallback for environments where Clipboard API is unavailable/denied
+        const el = document.createElement("textarea");
+        el.value = summaryText.textContent;
+        el.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+        document.body.appendChild(el);
+        el.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(el);
+        copyBtn.innerHTML = ok ? "✓ Copied!" : "Copy failed";
         setTimeout(() => { copyBtn.innerHTML = "&#128203; Copy"; }, 2000);
       });
     }
