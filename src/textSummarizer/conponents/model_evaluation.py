@@ -91,7 +91,7 @@ class ModelEvaluation:
             "rougeLsum": score["rougeLsum"],
         }
 
-        df = pd.DataFrame(rouge_dict, index=["pegasus"])
-        df.to_csv(str(self.config.metric_file_name), index=False)
+        df = pd.DataFrame(rouge_dict, index=["bart-samsum"])
+        df.to_csv(str(self.config.metric_file_name), index=True)
         logger.info(f"ROUGE scores: {rouge_dict}")
         logger.info(f"Metrics saved to: {self.config.metric_file_name}")

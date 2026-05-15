@@ -19,7 +19,7 @@ def run_pipeline():
         logger.info(f">>>>>> Stage {STAGE_01} completed <<<<<<\n\nx==========x")
     except Exception as e:
         logger.exception(e)
-        raise e
+        raise
 
     # Stage 02: Data Transformation
     try:
@@ -29,7 +29,7 @@ def run_pipeline():
         logger.info(f">>>>>> Stage {STAGE_02} completed <<<<<<\n\nx==========x")
     except Exception as e:
         logger.exception(e)
-        raise e
+        raise
 
     # Stage 03: Model Trainer
     try:
@@ -39,7 +39,7 @@ def run_pipeline():
         logger.info(f">>>>>> Stage {STAGE_03} completed <<<<<<\n\nx==========x")
     except Exception as e:
         logger.exception(e)
-        raise e
+        raise
 
     # Stage 04: Model Evaluation
     try:
@@ -49,7 +49,7 @@ def run_pipeline():
         logger.info(f">>>>>> Stage {STAGE_04} completed <<<<<<\n\nx==========x")
     except Exception as e:
         logger.exception(e)
-        raise e
+        raise
 
 
 if __name__ == "__main__":
