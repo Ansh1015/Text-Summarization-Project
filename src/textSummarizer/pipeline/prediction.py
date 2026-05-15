@@ -1,19 +1,26 @@
+import re
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 from textSummarizer.config.configuration import ConfigurationManager
 from textSummarizer.logging import logger
 
-# CPU-tuned: min_length=0 overrides the stored generation_config min_length=56
-# (which caused garbage padding on short inputs). num_beams=1 (greedy) is ~3x
-# faster than beams=4 with identical quality on SAMSum-style inputs.
-# The model's stored generation_config handles forced_bos_token_id, early_stopping,
-# no_repeat_ngram_size=3, and forced_eos_token_id automatically.
+# Generation settings per length mode.
+# - brief:    beams=2, hard-capped at 90 tokens, then sentence-trimmed to 2 sentences.
+#             This guarantees the shortest output with no mid-sentence truncation.
+# - standard: beams=2, natural stopping — produces the model's "default" summary.
+# - detailed: beams=4, min_new_tokens computed from input length (input_words // 3,
+#             clamped 15–50) to force more content without garbage on tiny inputs.
 _LENGTH_MAP = {
-    "brief":    {"max_new_tokens": 60,  "min_length": 0, "num_beams": 1},
-    "standard": {"max_new_tokens": 100, "min_length": 0, "num_beams": 1},
-    "detailed": {"max_new_tokens": 150, "min_length": 0, "num_beams": 2},
+    "brief":    {"max_new_tokens": 90,  "min_new_tokens": 5,  "num_beams": 2},
+    "standard": {"max_new_tokens": 110, "min_new_tokens": 25, "num_beams": 2},
+    "detailed": {"max_new_tokens": 160,                        "num_beams": 4},
 }
+_BRIEF_MAX_SENTENCES = 2
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
 
 
 class PredictionPipeline:
@@ -39,7 +46,11 @@ class PredictionPipeline:
         logger.info("PredictionPipeline ready.")
 
     def predict(self, text: str, length: str = "standard") -> str:
-        gen_kwargs = _LENGTH_MAP.get(length, _LENGTH_MAP["standard"])
+        gen_kwargs = dict(_LENGTH_MAP.get(length, _LENGTH_MAP["standard"]))
+
+        if length == "detailed":
+            input_words = len(text.split())
+            gen_kwargs["min_new_tokens"] = min(50, max(15, input_words // 3))
 
         inputs = self._tokenizer(
             text, return_tensors="pt", max_length=1024, truncation=True
@@ -48,7 +59,11 @@ class PredictionPipeline:
             summary_ids = self._model.generate(inputs["input_ids"], **gen_kwargs)
 
         output = self._tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-        # Strip non-breaking spaces (\xa0) that BART occasionally emits between sentences
         output = " ".join(output.replace("\xa0", "").split())
+
+        if length == "brief":
+            sentences = _split_sentences(output)
+            output = " ".join(sentences[:_BRIEF_MAX_SENTENCES])
+
         logger.info("Prediction complete. length=%s, output=%d chars", length, len(output))
         return output
