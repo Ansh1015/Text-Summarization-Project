@@ -50,7 +50,10 @@ class PredictionPipeline:
 
         if length == "detailed":
             input_words = len(text.split())
-            gen_kwargs["min_new_tokens"] = min(50, max(15, input_words // 3))
+            # Estimate natural EOS token count (~0.75 tokens per word) then push 15 past it.
+            # Clamped 20–70 to avoid garbage on very short inputs and runaway on very long.
+            estimated_natural = max(20, input_words * 3 // 4)
+            gen_kwargs["min_new_tokens"] = min(70, max(20, estimated_natural + 15))
 
         inputs = self._tokenizer(
             text, return_tensors="pt", max_length=1024, truncation=True
