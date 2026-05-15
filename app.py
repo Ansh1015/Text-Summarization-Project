@@ -2,10 +2,13 @@ import asyncio
 import functools
 import json
 import os
+import secrets
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -24,9 +27,12 @@ load_dotenv()
 # ── Config ──
 _API_KEY: str | None = os.getenv("API_KEY")
 _MODEL_VERSION: str = os.getenv("MODEL_VERSION", "bart-samsum-model")
+if "/" in _MODEL_VERSION or "\\" in _MODEL_VERSION or _MODEL_VERSION.startswith("."):
+    raise ValueError(f"Invalid MODEL_VERSION: {_MODEL_VERSION!r}")
 _MODEL_PATH = Path("artifacts/model_trainer") / _MODEL_VERSION
 _TOKENIZER_PATH = Path("artifacts/model_trainer/tokenizer")
 _INFERENCE_LOG = Path("logs/inference.jsonl")
+_LOG_LOCK = threading.Lock()
 
 _prediction_pipeline = None
 
@@ -43,7 +49,7 @@ async def _check_api_key(
 ) -> None:
     if _API_KEY is None:
         return  # dev mode: no key required
-    if x_api_key != _API_KEY:
+    if x_api_key is None or not secrets.compare_digest(x_api_key, _API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 
@@ -55,7 +61,7 @@ def _log_inference(text: str, summary: str, latency_ms: float) -> None:
         "words_out": len(summary.split()),
         "latency_ms": round(latency_ms, 1),
     }
-    with open(_INFERENCE_LOG, "a") as f:
+    with _LOG_LOCK, open(_INFERENCE_LOG, "a") as f:
         f.write(json.dumps(entry) + "\n")
 
 
@@ -68,9 +74,12 @@ async def lifespan(app: FastAPI):
             "or 'python main.py', then restart the server."
         )
     else:
-        from textSummarizer.pipeline.prediction import PredictionPipeline
-        _prediction_pipeline = PredictionPipeline()
-        logger.info("PredictionPipeline loaded at startup (model: %s).", _MODEL_VERSION)
+        try:
+            from textSummarizer.pipeline.prediction import PredictionPipeline
+            _prediction_pipeline = PredictionPipeline()
+            logger.info("PredictionPipeline loaded at startup (model: %s).", _MODEL_VERSION)
+        except Exception:
+            logger.exception("Failed to load PredictionPipeline — server will return 503 for all predict requests.")
     yield
     _prediction_pipeline = None
 
@@ -89,7 +98,7 @@ templates = Jinja2Templates(directory="templates")
 
 class PredictRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=_MAX_CHARS, description="Text to summarize")
-    length: str = Field(default="standard", pattern="^(brief|standard|detailed)$")
+    length: Literal["brief", "standard", "detailed"] = "standard"
 
 
 class PredictResponse(BaseModel):
@@ -126,18 +135,21 @@ async def _predict_core(body: PredictRequest) -> PredictResponse:
         loop = asyncio.get_event_loop()
         fn = functools.partial(_prediction_pipeline.predict, body.text, body.length)
         t0 = time.monotonic()
-        summary = await loop.run_in_executor(None, fn)
+        summary = await asyncio.wait_for(loop.run_in_executor(None, fn), timeout=60.0)
         _log_inference(body.text, summary, (time.monotonic() - t0) * 1000)
         return PredictResponse(
             summary=summary,
             word_count_in=len(body.text.split()),
             word_count_out=len(summary.split()),
         )
+    except asyncio.TimeoutError:
+        logger.error("Inference timed out after 60s")
+        raise HTTPException(status_code=504, detail="Inference timed out. Try a shorter input.")
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal error processing request.")
 
 
 # ── v1 router ──

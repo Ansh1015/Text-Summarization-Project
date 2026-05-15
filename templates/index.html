@@ -516,7 +516,9 @@
     });
 
     // ── Summarize ──
+    let _inFlight = false;
     async function summarize() {
+      if (_inFlight) return;
       const text = textarea.value.trim();
       if (!text) { showError("Please paste some text first."); return; }
       const words = text.split(/\s+/).length;
@@ -525,6 +527,7 @@
         return;
       }
 
+      _inFlight = true;
       setLoading(true);
       hideError();
 
@@ -551,6 +554,7 @@
       } catch {
         showError("Network error — could not reach the server.");
       } finally {
+        _inFlight = false;
         setLoading(false);
       }
     }
@@ -602,8 +606,8 @@
 
     function copyResult() {
       navigator.clipboard.writeText(summaryText.textContent).then(() => {
-        copyBtn.innerHTML = "✓ Copied!";
-        setTimeout(() => { copyBtn.innerHTML = "&#128203; Copy"; }, 2000);
+        copyBtn.textContent = "✓ Copied!";
+        setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 2000);
       }).catch(() => {
         // Fallback for environments where Clipboard API is unavailable/denied
         const el = document.createElement("textarea");
@@ -613,8 +617,8 @@
         el.select();
         const ok = document.execCommand("copy");
         document.body.removeChild(el);
-        copyBtn.innerHTML = ok ? "✓ Copied!" : "Copy failed";
-        setTimeout(() => { copyBtn.innerHTML = "&#128203; Copy"; }, 2000);
+        copyBtn.textContent = ok ? "✓ Copied!" : "Copy failed";
+        setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 2000);
       });
     }
   </script>
