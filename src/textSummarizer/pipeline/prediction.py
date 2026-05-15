@@ -20,10 +20,15 @@ from textSummarizer.logging import logger
 BRIEF_MAX_TOKENS = 40   # hard ceiling  (~29 words max before trim)
 STD_MIN_TOKENS   = 45   # hard floor    (~33 words min)
 
+# Encoder input capped at 512 tokens (down from 1024).
+# Attention is O(n²): 512 tokens = 4× less working memory than 1024.
+# Covers ~350 words of prose — sufficient for the 1000-word input limit.
+_ENCODER_MAX_TOKENS = 512
+
 _LENGTH_MAP = {
     "brief":    {"max_new_tokens": BRIEF_MAX_TOKENS, "min_new_tokens": 5,             "num_beams": 4},
     "standard": {"max_new_tokens": 110,              "min_new_tokens": STD_MIN_TOKENS, "num_beams": 2},
-    "detailed": {"max_new_tokens": 160,                                                "num_beams": 4},
+    "detailed": {"max_new_tokens": 160,                                                "num_beams": 2},
 }
 
 _BRIEF_MAX_SENTENCES = 2
@@ -53,6 +58,8 @@ class PredictionPipeline:
         logger.info("Loading model from %s ...", config.model_path)
         self._model = AutoModelForSeq2SeqLM.from_pretrained(str(config.model_path))
         self._model.eval()
+        # Suppress "forced_bos_token_id=0" warning — set it explicitly
+        self._model.config.forced_bos_token_id = 0
         logger.info("PredictionPipeline ready.")
 
     def predict(self, text: str, length: str = "standard") -> str:
@@ -68,10 +75,14 @@ class PredictionPipeline:
             gen_kwargs["min_new_tokens"] = min(90, max(55, estimated_natural + 15))
 
         inputs = self._tokenizer(
-            text, return_tensors="pt", max_length=1024, truncation=True
+            text, return_tensors="pt", max_length=_ENCODER_MAX_TOKENS, truncation=True
         )
         with torch.inference_mode():
-            summary_ids = self._model.generate(inputs["input_ids"], **gen_kwargs)
+            summary_ids = self._model.generate(
+                inputs["input_ids"],
+                attention_mask=inputs["attention_mask"],
+                **gen_kwargs,
+            )
 
         output = self._tokenizer.decode(summary_ids[0], skip_special_tokens=True)
         output = " ".join(output.replace("\xa0", "").split())

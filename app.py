@@ -110,10 +110,14 @@ class PredictResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request, "index.html",
         {"max_chars": _MAX_CHARS, "max_words": _MAX_WORDS},
     )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 async def _predict_core(body: PredictRequest) -> PredictResponse:
