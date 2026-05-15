@@ -5,17 +5,27 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from textSummarizer.config.configuration import ConfigurationManager
 from textSummarizer.logging import logger
 
-# Generation settings per length mode.
-# - brief:    beams=2, hard-capped at 90 tokens, then sentence-trimmed to 2 sentences.
-#             This guarantees the shortest output with no mid-sentence truncation.
-# - standard: beams=2, natural stopping — produces the model's "default" summary.
-# - detailed: beams=4, min_new_tokens computed from input length (input_words // 3,
-#             clamped 15–50) to force more content without garbage on tiny inputs.
+# Length ordering is enforced by arithmetic, not heuristics:
+#
+#   brief   ceiling  = BRIEF_MAX_TOKENS  (40)
+#   standard floor   = STD_MIN_TOKENS    (45)
+#   BRIEF_MAX_TOKENS < STD_MIN_TOKENS  ← invariant, never violate
+#
+# brief token count  ≤ 40  < 45 ≤  standard token count — always.
+# No input length or model behaviour can break this.
+#
+# detailed uses a dynamic floor above standard's natural stopping point,
+# keeping brief < standard < detailed for any medium+ input.
+
+BRIEF_MAX_TOKENS = 40   # hard ceiling  (~29 words max before trim)
+STD_MIN_TOKENS   = 45   # hard floor    (~33 words min)
+
 _LENGTH_MAP = {
-    "brief":    {"max_new_tokens": 90,  "min_new_tokens": 5,  "num_beams": 2},
-    "standard": {"max_new_tokens": 110, "min_new_tokens": 25, "num_beams": 2},
-    "detailed": {"max_new_tokens": 160,                        "num_beams": 4},
+    "brief":    {"max_new_tokens": BRIEF_MAX_TOKENS, "min_new_tokens": 5,             "num_beams": 4},
+    "standard": {"max_new_tokens": 110,              "min_new_tokens": STD_MIN_TOKENS, "num_beams": 2},
+    "detailed": {"max_new_tokens": 160,                                                "num_beams": 4},
 }
+
 _BRIEF_MAX_SENTENCES = 2
 
 
@@ -49,11 +59,13 @@ class PredictionPipeline:
         gen_kwargs = dict(_LENGTH_MAP.get(length, _LENGTH_MAP["standard"]))
 
         if length == "detailed":
+            # Push min_new_tokens past standard's natural stopping point.
+            # Estimate: ~0.75 tokens per input word + 15 token buffer.
+            # Clamped to 55–90 so short inputs don't get garbage and long
+            # inputs don't run forever.
             input_words = len(text.split())
-            # Estimate natural EOS token count (~0.75 tokens per word) then push 15 past it.
-            # Clamped 20–70 to avoid garbage on very short inputs and runaway on very long.
-            estimated_natural = max(20, input_words * 3 // 4)
-            gen_kwargs["min_new_tokens"] = min(70, max(20, estimated_natural + 15))
+            estimated_natural = max(STD_MIN_TOKENS, input_words * 3 // 4)
+            gen_kwargs["min_new_tokens"] = min(90, max(55, estimated_natural + 15))
 
         inputs = self._tokenizer(
             text, return_tensors="pt", max_length=1024, truncation=True
@@ -64,6 +76,9 @@ class PredictionPipeline:
         output = self._tokenizer.decode(summary_ids[0], skip_special_tokens=True)
         output = " ".join(output.replace("\xa0", "").split())
 
+        # Brief: trim to first 2 complete sentences. The hard BRIEF_MAX_TOKENS cap
+        # already limits generation; trimming just removes any partial final sentence
+        # that beam search couldn't complete within the token budget.
         if length == "brief":
             sentences = _split_sentences(output)
             output = " ".join(sentences[:_BRIEF_MAX_SENTENCES])
