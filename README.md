@@ -74,7 +74,7 @@ Open `http://localhost:8080` in your browser for the web UI.
 
 ## API Reference
 
-### `POST /predict`
+### `POST /v1/predict` (recommended) · `POST /predict` (legacy alias)
 
 Summarize a piece of text.
 
@@ -90,19 +90,22 @@ Summarize a piece of text.
 { "summary": "the generated summary", "word_count_in": 12, "word_count_out": 5, "error": null }
 ```
 
-**Constraints:** `text` must be 1–4096 characters.
+**Constraints:** `text` must be 1–8000 characters (≤ 1000 words).
+
+**Auth:** Set the `API_KEY` environment variable to require an `X-API-Key` header. Unset = open dev mode.
 
 **curl example:**
 ```bash
-curl -X POST http://localhost:8080/predict \
+curl -X POST http://localhost:8080/v1/predict \
   -H "Content-Type: application/json" \
   -d '{"text": "Hannah: Did you watch the game last night?\nSarah: Yes! It was incredible.\nHannah: I know right, that last minute goal was insane.", "length": "standard"}'
 ```
 
 **Error responses:**
-- `422` — input validation failed (empty or too long)
+- `422` — input validation failed (empty, too long, or invalid `length`)
 - `503` — model not loaded (run `python main.py` first)
-- `500` — inference error
+- `504` — inference timed out (try a shorter input)
+- `500` — internal error
 
 ---
 
@@ -135,7 +138,7 @@ Text-Summarization-Project/
 ├── main.py               → runs all 4 training stages sequentially
 ├── app.py                → FastAPI app (model loads at startup via lifespan)
 ├── templates/index.html  → web UI (JS fetch, loading spinner, error handling)
-├── tests/                → 15 unit + integration tests
+├── tests/                → 24 unit + integration tests
 ├── research/trials.ipynb → experimentation notebook
 ├── .github/workflows/    → CI pipeline (pytest + ruff)
 ├── Dockerfile            → inference-only container (Python 3.10-slim)

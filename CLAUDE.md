@@ -19,9 +19,9 @@ python main.py
 # serve FastAPI on :8080 (model loaded once at startup via lifespan)
 uvicorn app:app --host 0.0.0.0 --port 8080 --reload
 
-# tests (13 total, do NOT require trained artifacts — API tests mock the pipeline)
+# tests (24 total, do NOT require trained artifacts — API tests mock the pipeline)
 pytest tests/ -v
-pytest tests/test_api.py::test_predict_empty_text -v   # single test
+pytest tests/test_api.py::TestPredictRoute::test_empty_text_returns_422 -v   # single test
 ruff check .                                            # lint (matches CI)
 
 # docker (image expects artifacts/model_trainer/ to exist at build time)
@@ -44,4 +44,4 @@ Two distinct modes share one config layer:
 
 **Pre-trained weights:** `biggdaddyy/bart-samsum-finetuned` on HF Hub (1 epoch on SAMSum, ROUGE-1 ≈ 0.40). `scripts/download_model.py` pulls them into `artifacts/model_trainer/bart-samsum-model/` and symlinks `tokenizer/` to the same dir (HF convention stores both in one repo). Override repo via `HF_MODEL_REPO=...`.
 
-**Note on docs:** ARCHITECTURE.md still references PEGASUS in places; the actual model is BART (`facebook/bart-large-cnn`) per `config/config.yaml` and `app.py`. If editing docs, match current code.
+**Security:** `app.py` uses `secrets.compare_digest` for API key comparison, `asyncio.wait_for(timeout=60.0)` around inference, a `threading.Lock` on the JSONL log writer, and `Literal["brief","standard","detailed"]` for the length field. Do not weaken these when modifying auth or inference paths.

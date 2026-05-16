@@ -10,7 +10,7 @@ The project has two distinct modes:
 
 1. **Training mode** — `python main.py` runs a 4-stage pipeline that downloads data, tokenizes it, fine-tunes BART, and evaluates the result. This is slow (hours on CPU) and only needs to run once.
 
-2. **Inference mode** — `uvicorn app:app` serves a FastAPI web server that loads the trained model at startup and answers summarization requests. This is fast (<5s per request) and runs indefinitely.
+2. **Inference mode** — `uvicorn app:app` serves a FastAPI web server that loads the trained model at startup and answers summarization requests. Typical latency: 5–15s for short inputs, 15–30s for long inputs on CPU. Runs indefinitely.
 
 ---
 
@@ -58,12 +58,14 @@ The project has two distinct modes:
 │    │                                                            │
 │    ├── GET /  → templates/index.html (Jinja2)                   │
 │    │                                                            │
-│    └── POST /predict                                            │
-│          ↓ Pydantic validates {text: str, length: str}          │
-│          ↓ run_in_executor (non-blocking)                       │
-│          └── PredictionPipeline.predict(text, length)           │
-│                ↓ model.generate() with beam search              │
-│                returns {summary, word_count_in, word_count_out} │
+│    ├── POST /v1/predict  (auth: X-API-Key, rate: 10/min)        │
+│    │         ↓ Pydantic validates {text, length}                │
+│    │         ↓ run_in_executor (non-blocking, 60s timeout)      │
+│    │         └── PredictionPipeline.predict(text, length)       │
+│    │               ↓ model.generate() with beam search          │
+│    │               returns {summary, word_count_in/out}         │
+│    │                                                            │
+│    └── POST /predict  (legacy alias, hidden from OpenAPI docs)  │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -102,9 +104,11 @@ All paths are resolved as `Path` objects. `constants/__init__.py` anchors the co
 **Why fine-tune instead of use zero-shot?** BART-CNN is trained on news articles. Conversation summarization is structurally different (informal language, turn-taking, speaker attribution). Fine-tuning on SAMSum shifts the model's output distribution toward conversation-style summaries. ROUGE-1 improves from ~0.34 (zero-shot) to ~0.44 (fine-tuned).
 
 **Length control:** The prediction pipeline maps the `length` parameter to beam search config via `_LENGTH_MAP`:
-- `brief` — max 64 tokens, 4 beams
-- `standard` (default) — max 128 tokens, 8 beams
-- `detailed` — max 256 tokens, 8 beams
+- `brief` — max 40 tokens, 4 beams (hard-trimmed to 2 sentences)
+- `standard` (default) — max 110 tokens, 2 beams, min 45 tokens
+- `detailed` — max 160 tokens, 2 beams, dynamic min tokens
+
+Encoder input is capped at 512 tokens to keep attention memory O(n²) within CPU RAM limits.
 
 **Training setup:**
 - `Seq2SeqTrainer` with `predict_with_generate=True`
@@ -120,9 +124,17 @@ All paths are resolved as `Path` objects. `constants/__init__.py` anchors the co
 
 **Non-blocking inference:** `model.generate()` is synchronous and CPU-bound. Running it directly inside an `async def` route would block the entire event loop. It runs in a thread pool via `asyncio.get_event_loop().run_in_executor(None, pipeline.predict, text)`.
 
-**Input validation:** Pydantic `Field(min_length=1, max_length=4096)` rejects bad input before it reaches the model. Max 4096 chars aligns with BART's 1024-token input limit (roughly 4 chars/token).
+**Input validation:** Pydantic `Field(min_length=1, max_length=8000)` + a 1000-word count check rejects bad input before it reaches the model. The `length` field uses `Literal["brief","standard","detailed"]` — any other value is rejected with 422 before the model is touched.
 
-**503 on no model:** If training hasn't been run yet, the server starts but returns HTTP 503 with a human-readable message pointing to `python main.py`. This is more helpful than a 500 crash.
+**503 on no model:** If training hasn't been run yet, the server starts but returns HTTP 503 with a human-readable message pointing to `python main.py`. Model load failures at startup are caught and logged rather than silently swallowed.
+
+**Auth:** `X-API-Key` header, checked with `secrets.compare_digest` (timing-safe). Set `API_KEY` env var to enable; unset = dev mode, no key required.
+
+**Rate limiting:** `slowapi` 10 req/min per IP on all `/predict` routes.
+
+**Inference timeout:** `asyncio.wait_for(timeout=60.0)` wraps the executor call. Returns 504 if the model stalls instead of hanging the thread pool.
+
+**Inference log:** Every completed request appends a JSON line to `logs/inference.jsonl` with timestamp, word counts, and latency. Write is protected by a `threading.Lock` for concurrent-request safety.
 
 ---
 
@@ -151,7 +163,7 @@ tests/
                       no model, length param accepted, invalid length 422)
 ```
 
-Run with `pytest tests/ -v`. 15 tests, all passing. The API tests mock the prediction pipeline — no model weights needed to run the test suite.
+Run with `pytest tests/ -v`. 24 tests, all passing. The API tests mock the prediction pipeline — no model weights needed to run the test suite.
 
 ---
 

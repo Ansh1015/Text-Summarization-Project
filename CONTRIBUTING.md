@@ -33,7 +33,7 @@ python -c "from textSummarizer.config.configuration import ConfigurationManager;
 pytest tests/ -v
 ```
 
-All 15 tests should pass. The test suite does **not** require trained model artifacts — the API tests mock the prediction pipeline.
+All 24 tests should pass. The test suite does **not** require trained model artifacts — the API tests mock the prediction pipeline.
 
 For a quick pass/fail check:
 

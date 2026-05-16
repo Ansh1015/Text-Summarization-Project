@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Text Summarizer API",
     description="Fine-tuned BART model for general-purpose text summarization.",
-    version="0.2.0",
+    version="0.3.1",
     lifespan=lifespan,
 )
 app.state.limiter = limiter

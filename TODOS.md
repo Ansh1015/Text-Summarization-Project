@@ -19,5 +19,8 @@ Items explicitly deferred from this implementation. Tackle in a follow-up.
 - [ ] **Kubernetes / ECS deployment** — add `k8s/` or `infra/` directory with manifests.
 - [ ] **GPU-optimized training** — multi-GPU via `accelerate`, larger batch sizes.
 - [ ] **Quantization / ONNX export** — reduce inference latency for production.
-- [x] **CHANGELOG.md + semver** — CHANGELOG exists; app uses semver (currently v0.2.0). **Completed: v0.2.0 (2026-05-12)**
+- [x] **CHANGELOG.md + semver** — CHANGELOG exists; app uses semver (currently v0.3.1). **Completed: v0.2.0 (2026-05-12)**
 - [ ] **LLM API baseline comparison** — 2-day spike comparing zero-shot GPT-4o vs fine-tuned BART on 50 real SAMSum examples to validate the fine-tuning investment.
+- [ ] **BART badge wraps on mobile (375px)** — "BART · General Purpose" header badge wraps to two lines at 375px viewport. Fix: add `white-space: nowrap` to the badge in `templates/index.html`. Deferred: cosmetic only, no functional impact.
+- [ ] **CORS headers** — no `CORSMiddleware` configured. Blocks cross-origin fetch from non-same-origin frontends. Add `fastapi.middleware.cors.CORSMiddleware` to `app.py` if the API is ever served separately from the UI.
+- [ ] **Content-Security-Policy header** — no CSP middleware. Add a `default-src 'self'` policy via FastAPI middleware for production hardening.

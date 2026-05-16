@@ -4,6 +4,63 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.3.1] — 2026-05-17
+
+### What's new
+
+**Bug fixes**
+- Training pipeline now preserves the original exception traceback when a stage fails — makes debugging failed runs much easier
+- `metrics.csv` now correctly labels the evaluated model as `bart-samsum` (was mistakenly writing `pegasus`)
+
+**Security hardening**
+- API key comparison now uses `secrets.compare_digest` — closes a timing-attack vector on the auth check
+- Internal error details no longer leak to API callers — 500 responses return a generic message; full errors go to server logs only
+- `MODEL_VERSION` environment variable is validated against path-traversal characters at startup
+- The inference log writer (`logs/inference.jsonl`) is now protected by a `threading.Lock` — prevents JSONL corruption under concurrent requests
+- Copy button uses `textContent` instead of `innerHTML` — closes a potential XSS vector in the web UI
+- Summarize button now ignores double-clicks (in-flight lock) — prevents duplicate concurrent requests from the same browser tab
+
+**Performance**
+- Inference timeouts after 60 seconds and returns HTTP 504 instead of silently hanging the thread pool
+- Encoder input capped at 512 tokens (down from 1024) — cuts working memory by 4× on long documents (attention is O(n²)), restoring fast inference under RAM pressure
+- `detailed` mode beam count reduced from 4 to 2 — halves decoder working memory with negligible quality impact
+
+**Typical inference times (CPU, 8-core):**
+- Short input (< 100 words): 5–15s
+- Long input (~900 words): 15–30s (was 30–90s)
+
+---
+
+## [0.3.0] — 2026-05-15
+
+### What's new
+
+**API authentication**
+- Set `API_KEY` env var to require an `X-API-Key` header on all `/predict` routes
+- Unset = open dev mode, no key required — safe default for local use
+
+**Rate limiting**
+- 10 requests per minute per IP on all `/predict` routes via `slowapi`
+- Exceeding the limit returns 429 with a `Retry-After` header
+
+**API versioning**
+- Routes now live at `/v1/predict` — version prefix in the URL
+- `/predict` kept as a hidden backward-compatible alias so existing integrations keep working
+
+**Inference monitoring**
+- Every completed request logs a JSON line to `logs/inference.jsonl`: timestamp, words in/out, and latency in ms
+- Use this file to track compression ratios and spot performance regressions over time
+
+**Model versioning**
+- Set `MODEL_VERSION` env var to load a different checkpoint directory under `artifacts/model_trainer/`
+- Default: `bart-samsum-model`
+
+**Tests — 24 passing** (was 15)
+- Added: full auth test suite — no key required in dev, 401 on wrong key, 200 on correct key
+- Added: v1 route mirrors for model-not-loaded 503, valid mock request, empty text 422, invalid length 422
+
+---
+
 ## [0.2.0] — 2026-05-12
 
 ### What's new
